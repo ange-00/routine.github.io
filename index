@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周一至周日全日程管理板</title>
+    <!-- 加载 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 加载 React 核心库 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 加 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { margin: 0; padding: 0; }
+        .transition-all { transition-duration: 300ms; }
+        .news-content a { color: #6366f1; text-decoration: underline; }
+        .news-content h2 { font-size: 1.1rem; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .news-content p { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- 极简图标组件 ---
+        const Icon = ({ d, size = 24, className = "" }) => (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            <path d={d} />
+          </svg>
+        );
+
+        const Icons = {
+          Sun: (props) => <Icon d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M4.93 19.07l1.41 -1.41 M17.66 6.34l1.41 -1.41" {...props} />,
+          Moon: (props) => <Icon d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" {...props} />,
+          ChevronLeft: (props) => <Icon d="m15 18-6-6 6-6" {...props} />,
+          ChevronRight: (props) => <Icon d="m9 18 6-6-9-6" {...props} />,
+          CheckCircle2: (props) => <svg width={props.size} height={props.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>,
+          Circle: (props) => <Icon d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" {...props} />,
+          Edit2: (props) => <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" {...props} />,
+          Trash2: (props) => <Icon d="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...props} />,
+          Plus: (props) => <Icon d="M12 5v14M5 12h14" {...props} />,
+          X: (props) => <Icon d="M18 6 6 18M6 6l12 12" {...props} />,
+          Save: (props) => <Icon d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8" {...props} />,
+          Sparkles: (props) => <Icon d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z" {...props} />,
+          Newspaper: (props) => <Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M16 8h2 M16 12h2 M16 16h2 M6 8h6v8H6z" {...props} />,
+          Loader2: (props) => <svg width={props.size} height={props.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${props.className}`}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        };
+
+        const App = () => {
+          const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+          const apiKey = ""; 
+
+          const dayThemes = {
+            '周一': { gradient: 'from-indigo-600 to-blue-700', accent: 'text-indigo-200', shadow: 'shadow-blue-200', darkShadow: 'shadow-blue-900/40' },
+            '周二': { gradient: 'from-cyan-600 to-blue-600', accent: 'text-cyan-200', shadow: 'shadow-cyan-200', darkShadow: 'shadow-cyan-900/40' },
+            '周三': { gradient: 'from-emerald-600 to-teal-700', accent: 'text-emerald-200', shadow: 'shadow-emerald-200', darkShadow: 'shadow-emerald-900/40' },
+            '周四': { gradient: 'from-orange-500 to-amber-600', accent: 'text-orange-100', shadow: 'shadow-orange-200', darkShadow: 'shadow-orange-900/40' },
+            '周五': { gradient: 'from-rose-500 to-pink-600', accent: 'text-rose-100', shadow: 'shadow-rose-200', darkShadow: 'shadow-rose-900/40' },
+            '周六': { gradient: 'from-orange-600 to-red-600', accent: 'text-orange-100', shadow: 'shadow-red-200', darkShadow: 'shadow-red-900/40' },
+            '周日': { gradient: 'from-violet-500 to-purple-600', accent: 'text-violet-100', shadow: 'shadow-purple-200', darkShadow: 'shadow-purple-900/40' }
+          };
+
+          const callGemini = async (prompt, systemPrompt, useSearch = false) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+              contents: [{ parts: [{ text: prompt }] }],
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              ...(useSearch && { tools: [{ "google_search": {} }] })
+            };
+            const fetchWithRetry = async (retries = 5, delay = 1000) => {
+              try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text;
+              } catch (e) {
+                if (retries > 0) {
+                  await new Promise(r => setTimeout(r, delay));
+                  return fetchWithRetry(retries - 1, delay * 2);
+                }
+                throw e;
+              }
+            };
+            return fetchWithRetry();
+          };
+
+          const morningTemplate = [
+            { time: '08:30', title: '起床 & 唤醒', detail: '🌅 阳光 5min + 温水 + 拉伸', category: 'morning' },
+            { time: '09:30', title: '缓冲早餐', detail: '🥣 鸡蛋 + 杏仁', category: 'food', allowAi: true },
+            { time: '10:00', title: '上午深工作', detail: '💻 每小时站立 2min', category: 'work' },
+            { time: '12:00', title: '营养午餐', detail: '🍽 蛋白质 + 蔬菜 + 主食', category: 'food', allowAi: true },
+            { time: '13:00', title: '下午深工作', detail: '💻 每小时站立 2min', category: 'work' },
+            { time: '14:30', title: '能量补给', detail: '🧘 呼吸练习 5min', category: 'break', allowAi: true },
+          ];
+
+          const nightTemplate = [
+            { time: '21:00', title: '休闲时间', detail: '📕 远离屏幕', category: 'night' },
+            { time: '23:00', title: '睡前洗漱', detail: '🛁 热水澡', category: 'night' },
+            { time: '23:45', title: '生理降温', detail: '🌙 降灯 + 呼吸 5min', category: 'night' },
+            { time: '00:30', title: '熄灯入睡', detail: '😴 深度睡眠', category: 'night' },
+          ];
+
+          const generateInitialData = () => {
+            const data = {};
+            days.forEach(day => {
+              let daily = [];
+              const meet = [{ time: '14:35', title: '会议记笔记', detail: '📝 保持专注', category: 'work' }, { time: '17:55', title: '明日规划', detail: '✍️ 梳理计划', category: 'work' }];
+              if (['周一', '周二', '周三', '周四'].includes(day)) {
+                daily = [...morningTemplate, ...meet];
+                if (day === '周一') daily.push({ time: '18:30', title: '力量训练', detail: '🏋️‍♀️ 核心/大肌群', category: 'fitness', allowAi: true }, { time: '19:20', title: '晚餐', detail: '🍲 晚饭后慢走', category: 'food', allowAi: true }, ...nightTemplate);
+                else if (day === '周二' || day === '周四') {
+                    if (day === '周二') daily.push({ time: '19:30', title: '学习时间', detail: '📘 专注学习', category: 'work' }, { time: '20:30', title: '轻拉伸', detail: '🧘 10min', category: 'break', allowAi: true }, ...nightTemplate);
+                    else daily.push({ time: '18:30', title: 'Zone 2 有氧', detail: '🏃 120-130bpm', category: 'fitness', allowAi: true }, { time: '19:20', title: '晚餐', detail: '🍽 营养补给', category: 'food', allowAi: true }, ...nightTemplate);
+                }
+                else daily.push({ time: '18:30', title: '普拉提课程', detail: '🧘 核心塑形', category: 'fitness', allowAi: true }, { time: '20:00', title: '晚餐', detail: '🍲 简餐', category: 'food', allowAi: true }, ...nightTemplate);
+              } else if (day === '周五') {
+                daily = [...morningTemplate, { time: '15:30', title: '普拉提', detail: '🧘 核心训练', category: 'fitness', allowAi: true }, { time: '17:00', title: '学习时间', detail: '📖 提升', category: 'work' }, { time: '18:30', title: '吃饭', detail: '🍲 享受美食', category: 'food', allowAi: true }, { time: '19:30', title: '社交时间', detail: '🤝 聚会', category: 'night', allowAi: true }, ...nightTemplate.slice(1)];
+              } else if (day === '周六') {
+                daily = [{ time: '09:00', title: '自然唤醒', detail: '☕ 享受周末', category: 'morning' }, { time: '10:30', title: '户外活动', detail: '🎾 运动项目', category: 'fitness', allowAi: true }, { time: '18:00', title: '社交活动', detail: '🥳 朋友聚会', category: 'night', allowAi: true }, ...nightTemplate];
+              } else {
+                daily = [{ time: '10:00', title: '深度放松', detail: '🧘 不设闹钟', category: 'morning' }, { time: '15:00', title: '轻松散步', detail: '🚶 30min', category: 'fitness', allowAi: true }, { time: '18:00', title: '学习时间', detail: '📖 深度阅读', category: 'work' }, { time: '20:00', title: '下周规划', detail: '✍️ 梳理下周计划', category: 'work', allowAi: true }, ...nightTemplate];
+              }
+              data[day] = daily.map((t, i) => ({ ...t, id: `${day}-${Date.now()}-${i}`, completed: false }));
+            });
+            return data;
+          };
+
+          const getDatesOfWeek = (offset = 0) => {
+            const today = new Date();
+            const dayOfWeek = today.getDay(); 
+            const diffToMonday = today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+            const monday = new Date(today.getFullYear(), today.getMonth(), diffToMonday + (offset * 7));
+            return days.map((_, index) => {
+              const d = new Date(monday);
+              d.setDate(monday.getDate() + index);
+              return { label: `${d.getMonth() + 1}/${d.getDate()}` };
+            });
+          };
+
+          const [weekOffset, setWeekOffset] = React.useState(0); 
+          const [currentDay, setCurrentDay] = React.useState('周一');
+          const [weekDates, setWeekDates] = React.useState(getDatesOfWeek(0));
+          const [theme, setTheme] = React.useState('light');
+          const [allTasks, setAllTasks] = React.useState({ 0: generateInitialData() });
+          const [showAddForm, setShowAddForm] = React.useState(false);
+          const [showNewsModal, setShowNewsModal] = React.useState(false);
+          const [newTask, setNewTask] = React.useState({ time: '', title: '', detail: '', category: 'work' });
+          const [editingId, setEditingId] = React.useState(null);
+          const [editForm, setEditForm] = React.useState(null);
+          const [aiLoading, setAiLoading] = React.useState({});
+          const [newsLoading, setNewsLoading] = React.useState(false);
+          const [aiResults, setAiResults] = React.useState({});
+          const [newsData, setNewsData] = React.useState("");
+
+          React.useEffect(() => {
+            const hour = new Date().getHours();
+            setTheme(hour >= 19 || hour < 7 ? 'dark' : 'light');
+          }, []);
+
+          React.useEffect(() => {
+            setWeekDates(getDatesOfWeek(weekOffset));
+            if (!allTasks[weekOffset]) setAllTasks(prev => ({ ...prev, [weekOffset]: generateInitialData() }));
+          }, [weekOffset]);
+
+          const currentTasks = allTasks[weekOffset]?.[currentDay] || [];
+          const progress = Math.round((currentTasks.filter(t => t.completed).length / (currentTasks.length || 1)) * 100);
+          const currentTheme = dayThemes[currentDay] || dayThemes['周一'];
+
+          const toggleTask = (id) => {
+            const updated = currentTasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+            setAllTasks({...allTasks, [weekOffset]: {...allTasks[weekOffset], [currentDay]: updated}});
+          };
+
+          const deleteTask = (e, id) => {
+            e.stopPropagation();
+            const updated = currentTasks.filter(t => t.id !== id);
+            setAllTasks({...allTasks, [weekOffset]: {...allTasks[weekOffset], [currentDay]: updated}});
+          };
+
+          const startEdit = (e, task) => {
+            e.stopPropagation();
+            setEditingId(task.id);
+            setEditForm({ ...task });
+          };
+
+          const saveEdit = (e) => {
+            e.stopPropagation();
+            const updated = currentTasks.map(t => t.id === editingId ? { ...editForm } : t).sort((a, b) => a.time.localeCompare(b.time));
+            setAllTasks({...allTasks, [weekOffset]: {...allTasks[weekOffset], [currentDay]: updated}});
+            setEditingId(null);
+          };
+
+          const addTask = () => {
+            if (!newTask.time || !newTask.title) return;
+            const item = { ...newTask, id: `man-${Date.now()}`, completed: false, allowAi: ['fitness', 'food', 'break'].includes(newTask.category) };
+            const updated = [...currentTasks, item].sort((a, b) => a.time.localeCompare(b.time));
+            setAllTasks({...allTasks, [weekOffset]: {...allTasks[weekOffset], [currentDay]: updated}});
+            setNewTask({ time: '', title: '', detail: '', category: 'work' });
+            setShowAddForm(false);
+          };
+
+          const getAiSuggestion = async (e, task) => {
+            e.stopPropagation();
+            setAiLoading(prev => ({ ...prev, [task.id]: true }));
+            try {
+              let prompt = `针对事项 "${task.title} (${task.detail})"，给出建议。`;
+              if (task.category === 'fitness') prompt += "请提供具体的运动动作组合，约40分钟量，包含次数。";
+              else if (task.category === 'food') prompt += "请提供健康饮食的食材搭配和比例建议。";
+              else prompt += "请提供 3 个简洁的执行建议或 YouTube 搜索关键词。";
+              
+              const res = await callGemini(prompt, "你是一个极简主义高效教练，用中文提供简洁建议，并排版精美。");
+              setAiResults(prev => ({ ...prev, [task.id]: res }));
+            } catch (err) {
+              setAiResults(prev => ({ ...prev, [task.id]: "获取建议失败。" }));
+            } finally {
+              setAiLoading(prev => ({ ...prev, [task.id]: false }));
+            }
+          };
+
+          const fetchIndustryNews = async () => {
+            setShowNewsModal(true);
+            if (newsData) return; // 如果已有数据则不重复加载
+            setNewsLoading(true);
+            try {
+              const sysPrompt = "你是一位资深产品设计专家 (CPO 级别)。你的目标是为一位关注金融、宏观经济、前沿科技和 UX 设计的资深设计师提供过去 24 小时的行业情报摘要。";
+              const prompt = "请搜索并汇总过去 24 小时内关于 Bloomberg 金融洞察、Stratechery 科技策略、UX Collective 设计趋势以及 AI 和游戏的最新动态。要求为每条核心内容提供：1. 核心总结 2. 深度价值提炼（从 UX 交互、商业模式或产品策略角度） 3. 原始链接。请使用 Markdown 格式排版。";
+              const res = await callGemini(prompt, sysPrompt, true);
+              setNewsData(res);
+            } catch (err) {
+              setNewsData("无法连接到情报源，请稍后再试。");
+            } finally {
+              setNewsLoading(false);
+            }
+          };
+
+          const getCategoryStyles = (cat) => {
+            const isDark = theme === 'dark';
+            const colors = {
+              morning: isDark ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : 'bg-orange-50 text-orange-600 border-orange-100',
+              work: isDark ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-blue-50 text-blue-600 border-blue-100',
+              fitness: isDark ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-red-50 text-red-600 border-red-100',
+              night: isDark ? 'bg-slate-500/10 text-slate-400 border-slate-500/30' : 'bg-slate-50 text-slate-600 border-slate-100',
+              food: isDark ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-green-50 text-green-600 border-green-100',
+              break: isDark ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-purple-50 text-purple-600 border-purple-100',
+            };
+            return colors[cat] || (isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-50 text-gray-600');
+          };
+
+          const getDayDisplayTitle = (day) => {
+            const map = { '周一': 'Ramp-up & Strength', '周二': 'Focus & Learn', '周三': 'Intensity Balance', '周四': 'Focus & Cardio', '周五': 'Wrap-up & Control', '周六': 'Rest & Recharge', '周日': 'Rest & Recharge' };
+            return map[day];
+          };
+
+          return (
+            <div className={`min-h-screen p-4 md:p-8 font-sans transition-colors duration-700 relative ${
+              theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
+            }`}>
+              
+              {/* 主题切换按钮 */}
+              <button 
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className={`fixed top-4 right-4 z-50 p-2 rounded-full backdrop-blur-sm border border-transparent ${
+                  theme === 'dark' ? 'bg-white/5 text-slate-500 hover:text-slate-300' : 'bg-black/5 text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {theme === 'light' ? <Icons.Sun size={18} /> : <Icons.Moon size={18} />}
+              </button>
+
+              {/* 浮动按钮组 */}
+              <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+                <button 
+                  onClick={fetchIndustryNews}
+                  className={`p-2.5 rounded-full shadow-lg transition-all hover:scale-110 active:scale-95 ${
+                    theme === 'dark' ? 'bg-slate-800 text-indigo-400 border border-slate-700' : 'bg-white text-slate-500 border border-slate-100'
+                  }`}
+                  title="今日内参"
+                >
+                  <Icons.Newspaper size={18} />
+                </button>
+                <button 
+                  onClick={() => setShowAddForm(true)}
+                  className={`p-2.5 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${
+                    theme === 'dark' ? 'bg-indigo-600 text-white shadow-indigo-900/40' : 'bg-slate-900 text-white shadow-slate-400'
+                  }`}
+                  title="新事项"
+                >
+                  <Icons.Plus size={18} />
+                </button>
+              </div>
+
+              {/* 新闻内参模态框 */}
+              {showNewsModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in">
+                  <div className={`w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-[2.5rem] border shadow-2xl ${
+                    theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-900'
+                  }`}>
+                    <div className="p-8 border-b border-white/5 flex justify-between items-center">
+                      <div>
+                        <h2 className="text-2xl font-black flex items-center gap-2">
+                          <Icons.Newspaper className="text-indigo-500" /> 今日内参摘要
+                        </h2>
+                        <p className="text-xs opacity-50 uppercase tracking-widest mt-1">CPO LEVEL INTELLIGENCE · PAST 24H</p>
+                      </div>
+                      <button onClick={() => setShowNewsModal(false)} className="p-2 rounded-full hover:bg-white/5 transition-colors">
+                        <Icons.X size={24} className="text-slate-400" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
+                      {newsLoading ? (
+                        <div className="py-20 flex flex-col items-center gap-4 opacity-50">
+                          <Icons.Loader2 size={40} className="text-indigo-500" />
+                          <p className="text-sm font-bold animate-pulse">正在穿透信源，提取全球深度资讯...</p>
+                        </div>
+                      ) : (
+                        <div className="news-content text-sm leading-relaxed prose prose-invert max-w-none">
+                          <div className="whitespace-pre-wrap font-medium opacity-90">
+                            {newsData}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-6 border-t border-white/5 text-center">
+                      <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest italic">Powered by Gemini Deep Reasoning & Google Search</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 添加事项模态框 */}
+              {showAddForm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in">
+                  <div className={`w-full max-w-sm p-6 rounded-[2.5rem] border shadow-2xl ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-100 text-slate-900'}`}>
+                    <div className="flex justify-between items-center mb-5"><h3 className="text-lg font-bold">新事项</h3><button onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-slate-200"><Icons.X size={18} /></button></div>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                        <input type="time" className={`p-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-50'}`} value={newTask.time} onChange={e => setNewTask({...newTask, time: e.target.value})} />
+                        <select className={`p-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-50'}`} value={newTask.category} onChange={e => setNewTask({...newTask, category: e.target.value})}><option value="work">工作/学习</option><option value="fitness">健身</option><option value="food">饮食</option><option value="night">晚间</option></select>
+                    </div>
+                    <input type="text" placeholder="事项名称" className={`w-full p-2.5 mb-4 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-50'}`} value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
+                    <button onClick={addTask} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">确认加入</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="max-w-2xl mx-auto">
+                <div className="flex items-center gap-1 mb-6">
+                  <button onClick={() => setWeekOffset(weekOffset - 1)} className="p-2 opacity-30 hover:opacity-100 transition-all"><Icons.ChevronLeft size={24} /></button>
+                  <div className="flex-1 flex justify-between gap-1.5 no-scrollbar">
+                    {days.map((day, idx) => (
+                      <button key={day} onClick={() => setCurrentDay(day)} className={`flex-1 min-w-[50px] py-2 rounded-2xl text-xs font-bold transition-all shadow-sm ${currentDay === day ? (theme === 'dark' ? 'bg-indigo-600 text-white shadow-indigo-900/20' : 'bg-slate-900 text-white shadow-slate-300') : (theme === 'dark' ? 'bg-slate-900 text-slate-500 border border-slate-800' : 'bg-white text-slate-400 border border-slate-100')}`}>
+                        <div className="flex flex-col items-center leading-none gap-0.5"><span className="text-[9px] uppercase tracking-tighter">{day}</span><span className="text-[11px] font-mono tracking-tighter">{weekDates[idx]?.label}</span></div>
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setWeekOffset(weekOffset + 1)} className="p-2 opacity-30 hover:opacity-100 transition-all"><Icons.ChevronRight size={24} /></button>
+                </div>
+
+                <div className={`rounded-[2.5rem] shadow-lg border overflow-hidden mb-6 transition-all duration-500 ${theme === 'dark' ? `border-white/5 ${currentTheme.darkShadow}` : `border-slate-100 ${currentTheme.shadow}`}`}>
+                  <div className={`p-8 bg-gradient-to-br ${currentTheme.gradient} text-white relative overflow-hidden`}>
+                    <div className="absolute top-[-10%] right-[-5%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="flex justify-between items-end relative z-10 text-left">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">{currentDay} 日程</span>
+                        <h1 className="text-3xl font-black leading-tight mt-1">{getDayDisplayTitle(currentDay)}</h1>
+                        <p className="text-xs font-mono opacity-70 mt-1">{weekDates[days.indexOf(currentDay)]?.label}</p>
+                      </div>
+                      <div className="text-5xl font-black opacity-95">{progress}%</div>
+                    </div>
+                    <div className="mt-8 h-1.5 bg-black/20 rounded-full overflow-hidden"><div className="h-full bg-white transition-all duration-1000" style={{ width: `${progress}%` }} /></div>
+                  </div>
+
+                  <div className={`p-5 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
+                    <div className="space-y-3.5">
+                      {currentTasks.map((task) => (
+                        <div key={task.id} className="group relative">
+                          {editingId === task.id ? (
+                            <div className={`p-5 rounded-3xl border animate-in slide-in-from-top-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-indigo-50 border-indigo-200'}`}>
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                <input type="time" className={`p-2 rounded-xl border text-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-indigo-100'}`} value={editForm.time} onChange={e => setEditForm({...editForm, time: e.target.value})} />
+                                <input type="text" className={`p-2 rounded-xl border text-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-indigo-100'}`} value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} />
+                              </div>
+                              <input type="text" className={`w-full p-2 mb-3 rounded-xl border text-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-indigo-100'}`} value={editForm.detail} onChange={e => setEditForm({...editForm, detail: e.target.value})} />
+                              <div className="flex gap-2"><button onClick={saveEdit} className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"><Icons.Save size={14} /> 保存</button><button onClick={() => setEditingId(null)} className="px-4 py-2 border rounded-xl text-xs opacity-50">取消</button></div>
+                            </div>
+                          ) : (
+                            <div onClick={() => toggleTask(task.id)} className={`flex items-start gap-4 p-5 rounded-[1.8rem] border cursor-pointer transition-all ${task.completed ? 'opacity-40 grayscale bg-slate-50 border-transparent' : theme === 'dark' ? 'bg-slate-900 border-slate-800 hover:border-slate-600' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'}`}>
+                              <div className="mt-1">{task.completed ? <Icons.CheckCircle2 size={24} className="text-emerald-500" /> : <Icons.Circle size={24} className="text-slate-200" />}</div>
+                              <div className="flex-1 pr-12 text-left">
+                                <div className="flex items-center gap-2 mb-0.5"><span className="font-mono font-bold text-xs opacity-40">{task.time}</span><span className={`px-2 py-0.5 rounded-md text-[9px] font-bold border ${getCategoryStyles(task.category)} uppercase`}>{task.category}</span></div>
+                                <h3 className={`font-bold ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</h3>
+                                <p className="text-xs opacity-60 leading-relaxed">{task.detail}</p>
+                                
+                                {task.allowAi && !task.completed && (
+                                  <button onClick={(e) => getAiSuggestion(e, task)} className={`mt-3 flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold border transition-all ${theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                                    {aiLoading[task.id] ? <Icons.Loader2 size={12} className="animate-spin" /> : <Icons.Sparkles size={12} />} ✨ AI 建议
+                                  </button>
+                                )}
+
+                                {aiResults[task.id] && (
+                                  <div className={`mt-3 p-4 rounded-2xl text-[11px] leading-relaxed whitespace-pre-wrap animate-in slide-in-from-top-1 ${theme === 'dark' ? 'bg-indigo-950/40 text-indigo-200' : 'bg-indigo-50/50 text-indigo-700'}`}>
+                                    <div className="font-bold mb-1 border-b border-current opacity-30 pb-1">Intelligence Advice</div>
+                                    {aiResults[task.id]}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="absolute top-5 right-5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onClick={(e) => startEdit(e, task)} className="p-1.5 hover:text-indigo-600"><Icons.Edit2 size={16} /></button>
+                                <button onClick={(e) => deleteTask(e, task.id)} className="p-1.5 hover:text-red-500"><Icons.Trash2 size={16} /></button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
